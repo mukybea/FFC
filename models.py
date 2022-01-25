@@ -34,10 +34,10 @@ class CNNenc(nn.Module):
       super().__init__()
 
       self.conv1 = nn.Sequential(
-      nn.Conv2d(3, 16, 3, 1),
+      nn.Conv2d(3, 16, 3, 3),
       nn.ReLU(),
       nn.BatchNorm2d(16),
-      nn.Conv2d(16, 32, 3, 1),
+      nn.Conv2d(16, 32, 3, 2),
       nn.ReLU(),
       nn.Conv2d(32, 64, 3, 1),
       nn.BatchNorm2d(64),
@@ -45,10 +45,10 @@ class CNNenc(nn.Module):
       )
 
       self.conv2 = nn.Sequential(
-      nn.Conv2d(3, 16, 3, 1),
+      nn.Conv2d(3, 16, 3, 3),
       nn.ReLU(),
       nn.BatchNorm2d(16),
-      nn.Conv2d(16, 32, 3, 1),
+      nn.Conv2d(16, 32, 3, 2),
       nn.ReLU(),
       nn.Conv2d(32, 64, 3, 1),
       nn.BatchNorm2d(64),
@@ -105,6 +105,7 @@ class FFC(nn.Module):
   def forward(self,x_1, x_2, batch_size):
 
     if x_2 is not None:
+      # print("x2 shape is ", x_2.shape)
       xsplit1_a = self.split_lg(x_1)
       xsplit2_a = torch.clone(xsplit1_a)
       xsplit1_b = self.split_lg(x_2)
@@ -124,15 +125,21 @@ class FFC(nn.Module):
     # print("xl_g", xl_g.shape)
     #Spectral Transform block
     conv_bn_relu_1 =  self.conv1x(xsplit2)
-    fft = torch.fft.rfftn(conv_bn_relu_1)
+    # print("conv_bn_relu_1", conv_bn_relu_1.shape)
+    fft_dim = (-3, -2, -1) 
+    fft = torch.fft.rfftn(conv_bn_relu_1, dim=fft_dim, norm='ortho')
+    # fft = torch.fft.rfftn(conv_bn_relu_1)
     # print("fft ",fft.real.shape, fft.imag.shape)
     ffted = torch.stack((fft.real, fft.imag), dim=-1)
     ffted = ffted.permute(0, 1, 4, 2, 3).contiguous()  # (batch, c, 2, h, w/2+1)
     ffted = ffted.view((batch_size, -1,) + ffted.size()[3:])
+    # print("ffted", ffted.shape)
     
 
     conv_bn_relu_2 = self.bn_relu_2(self.conv2x(ffted))
+    # print("convt", conv_bn_relu_2.shape)
     ifft = torch.fft.irfftn(conv_bn_relu_2)
+    # print(ifft.shape)
     spectral_out = torch.add(ifft, conv_bn_relu_1)
     spectral_out_2 = self.conv1x1(spectral_out)
     # print("spectral_out_2", xl_g.shape, spectral_out_2.shape)
@@ -142,6 +149,11 @@ class FFC(nn.Module):
     # print("local_feat --", local_feat.shape, global_feat.shape)
 
     feat_out = torch.cat((local_feat, global_feat), dim=1)
+    
+    # print("FT",feat_out.shape)
+    # feat_out = feat_out.view(feat_out.size(0), feat_out.size(1), -1)
+    # feat_out = feat_out.mean(dim=-1)
+    # print(feat_out.shape)
 
 
 
@@ -152,10 +164,10 @@ class Neural_classifier(nn.Module):
     super().__init__()
 
     self.classify = nn.Sequential(
-        nn.Linear(15618304, 1024),
-        nn.BatchNorm1d(1024),
-        nn.Sigmoid(),
-        nn.Linear(1024, 11),
+        # nn.Linear(15618304, 1024),
+        # nn.BatchNorm1d(64),
+        # nn.Sigmoid(),
+        nn.Linear(64, 11),
         nn.Tanh()
     )
     # self.lin1 = nn.Linear(x_size, 1024)
@@ -210,13 +222,19 @@ class Builds(nn.Module):
     # n_class = self.n_class
 
     xenc_1, xenc_2 = self.convenc(x)
+    # print("enc 1", xenc_1.shape)
     xffced1 = self.ffc(xenc_1, xenc_2, batch_size)
     xffced2 = self.ffc(xffced1, None, batch_size)
 
     xcat = torch.add(xenc_1, xffced2)
-    xcat = xcat.reshape(batch_size,-1)
+    # print("FT",feat_out.shape)
+    feat_out = xcat.view(xcat.size(0), xcat.size(1), -1)
+    feat_out = feat_out.mean(dim=-1)
+    # print("after global pool",feat_out.shape)
+
+    # xcat = xcat.reshape(batch_size,-1)
     # print("--- xcat ----- ", xcat.size())
 
-    classified = self.classfy(xcat)
+    classified = self.classfy(feat_out)
 
     return classified

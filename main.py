@@ -28,16 +28,17 @@ def main():
 
 	load_model = Builds()
 	
-	train_loader_A, train_loader_B = train_test_loader.train_loader()
-	test_loader_A, test_loader_B = train_test_loader.test_loader()
+	train_loader = train_test_loader.train_loader()
+	test_loader = train_test_loader.test_loader()
 
 
 	# print("len of train_loader_A", len(train_loader_A.dataset))
 	# print("len of train_loader_B", len(train_loader_B.dataset))
-	# for im, lb in train_loader_B:
-	# 	print(im.shape)
-	# 	print(lb[8])
-	# 	break
+	# for idxx, (im, lb,lbl) in enumerate(train_loader):
+	# 	print(im.shape, lb.shape, lbl)
+	# 	# print(lb[8])
+	# 	if idxx ==20:
+	# 			break
 	# xc = os.listdir(os.path.join(os.getcwd(), "datasets/Train/view_1/View1_photo"))
 	# labels = 
 	# print(test_loader_A.dataset.class_to_idx)
@@ -51,13 +52,13 @@ def main():
 	# 	elif idx == 500:
 	# 		break
 
-	for epoch in range(0,10):
+	for epoch in range(0,50):
 		# break
 
-		train.trainer(epoch, train_loader_A, train_loader_B, device, model, optimizer, criterion)
+		train.trainer(epoch, train_loader, device, model, optimizer, criterion)
 		load_model.load_state_dict(torch.load(os.path.join(os.getcwd(),"saved_models/model.pth")))
 		load_model.to(device)
-		track_label, track_output = test.tester(epoch, test_loader_A, test_loader_B, device, load_model)
+		track_label, track_output = test.tester(epoch, test_loader, device, load_model)
 
 	precision, recall, f1_score = metrics.cal_metric(track_label, track_output)
 	print("precision: ", precision)

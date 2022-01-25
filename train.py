@@ -9,7 +9,7 @@ from tqdm import tqdm
 
 
 
-def trainer(epoch, train_loader_A, train_loader_B, device, model, optimizer, criterion):
+def trainer(epoch, train_loader, device, model, optimizer, criterion):
     
 
     idx = 0
@@ -17,8 +17,8 @@ def trainer(epoch, train_loader_A, train_loader_B, device, model, optimizer, cri
     total_correct = 0
     no_of_samples_so_far = 0
     loss_so_far = 0
-    with tqdm(train_loader_A, unit="batch") as tepoch:
-     for (view_a,label), (view_b,_) in zip(tepoch, train_loader_B):
+    with tqdm(train_loader, unit="batch") as tepoch:
+     for (view_a, view_b, label) in tepoch:
         batch_size = view_a.size(0)
         # print(view_b.shape, view_a.shape)
         tepoch.set_description(f"Epoch {epoch+1}")

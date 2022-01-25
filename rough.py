@@ -14,7 +14,7 @@ def get_device():
 device = get_device()
 # print(os.listdir(os.path.join(os.getcwd(), "datasets/Train/view_1/View1_photo")))
 
-x = torch.randn(8,2,3,500,500).to(device)
+x = torch.randn(8,2,3,28,28).to(device)
 
 d = models.Builds().to(device)
 

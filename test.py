@@ -2,7 +2,7 @@ import torch
 from tqdm import tqdm
 
 
-def tester(epoch, test_loader_A, test_loader_B, device, load_model):
+def tester(epoch, test_loader, device, load_model):
 
     track_output = torch.zeros(64).to(device)
     track_label = torch.zeros(64).to(device)
@@ -12,8 +12,8 @@ def tester(epoch, test_loader_A, test_loader_B, device, load_model):
     no_of_samples_so_far = 0
     # trch = torch.zeros_like()
     with torch.no_grad():
-      with tqdm(test_loader_A, unit="batch") as tepoch:
-        for (view_a,label), (view_b,_) in zip(test_loader_A, test_loader_B):
+      with tqdm(test_loader, unit="batch") as tepoch:
+        for view_a, view_b, label in test_loader:
           batch_size = view_a.size(0)
           tepoch.set_description(f"Test epoch {epoch}")
           views = torch.stack([view_a.to(device), view_b.to(device)]).transpose(1,0)
