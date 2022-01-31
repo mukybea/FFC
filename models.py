@@ -8,14 +8,18 @@ class Attention(nn.Module):
   def __init__(self):
     super().__init__()
 
-    self.conv1x = nn.Sequential(
-        nn.Conv2d(64, 64, 1, 1, padding="same"),
-        nn.ReLU()
-    )
+    # self.conv1x = nn.Sequential(
+    #     nn.Conv2d(64, 64, 1, 1, padding="same"),
+    #     nn.LeakyReLU()
+    # )
+    self.conv1x = nn.Conv2d(64, 64, 1, 1)
+    self.relux = nn.LeakyReLU()
+    nn.init.kaiming_normal_(self.conv1x.weight, a=0.01, mode='fan_in', nonlinearity='leaky_relu')
+    
   def forward(self,x):
       xc = self.conv1x(x)
       # print("xxc",xc.shape)
-      return F.softmax(self.conv1x(x), dim=3)
+      return F.softmax(self.relux(self.conv1x(x)), dim=3)
 
 class Conv_BN_RELU(nn.Module):
   def __init__(self):
@@ -23,7 +27,7 @@ class Conv_BN_RELU(nn.Module):
     self.conv1xx = nn.Sequential(
         nn.Conv2d(32,32,1),
         nn.BatchNorm2d(32),
-        nn.ReLU()
+        nn.LeakyReLU()
     )
 
   def forward(self, x):
@@ -35,24 +39,30 @@ class CNNenc(nn.Module):
 
       self.conv1 = nn.Sequential(
       nn.Conv2d(3, 16, 3, 3),
-      nn.ReLU(),
+      nn.LeakyReLU(),
       nn.BatchNorm2d(16),
       nn.Conv2d(16, 32, 3, 2),
-      nn.ReLU(),
+      nn.LeakyReLU(),
+      nn.Dropout2d(p=0.2),
       nn.Conv2d(32, 64, 3, 1),
       nn.BatchNorm2d(64),
-      nn.Sigmoid()
+      nn.Dropout2d(p=0.2),
+      nn.LeakyReLU()
+      # nn.Sigmoid()
       )
 
       self.conv2 = nn.Sequential(
       nn.Conv2d(3, 16, 3, 3),
-      nn.ReLU(),
+      nn.LeakyReLU(),
       nn.BatchNorm2d(16),
       nn.Conv2d(16, 32, 3, 2),
-      nn.ReLU(),
+      nn.LeakyReLU(),
+      nn.Dropout2d(p=0.2),
       nn.Conv2d(32, 64, 3, 1),
       nn.BatchNorm2d(64),
-      nn.Sigmoid()
+      nn.Dropout2d(p=0.2),
+      nn.LeakyReLU(),
+      # nn.Sigmoid()
       )
       
       self.attend1 = Attention()
@@ -90,33 +100,44 @@ class FFC(nn.Module):
     self.conv1x1 = nn.Conv2d(32, 32, 1)
     self.bn_relu = nn.Sequential(
     nn.BatchNorm2d(32),
-    nn.ReLU()
+    nn.LeakyReLU()
     )
     self.bn_relu_2 = nn.Sequential(
     nn.BatchNorm2d(32),
-    nn.ReLU()
+    nn.LeakyReLU()
     )
 
     self.conv1x = Conv_BN_RELU()
-    self.conv2x = nn.Sequential(
-        nn.Conv2d(64,32,1)
-    )
+    self.conv2x = nn.Conv2d(64,32,1)
+    nn.init.kaiming_normal_(self.conv2x.weight, a=0.01, mode='fan_in', nonlinearity='leaky_relu')
+    nn.init.kaiming_normal_(self.l_l.weight, a=0.01, mode='fan_in', nonlinearity='leaky_relu')
+    nn.init.kaiming_normal_(self.l_g.weight, a=0.01, mode='fan_in', nonlinearity='leaky_relu')
+    nn.init.kaiming_normal_(self.g_l.weight, a=0.01, mode='fan_in', nonlinearity='leaky_relu')
+    self.last_layer = nn.Conv2d(64,11,1)
 
   def forward(self,x_1, x_2, batch_size):
 
     if x_2 is not None:
-      # print("x2 shape is ", x_2.shape)
-      xsplit1_a = self.split_lg(x_1)
-      xsplit2_a = torch.clone(xsplit1_a)
-      xsplit1_b = self.split_lg(x_2)
-      xsplit2_b = torch.clone(xsplit1_b)
+      xsplit_a = torch.split(x_1, 32, dim=1)
+      xsplit_b = torch.split(x_2, 32, dim=1)
+      xsplit1_a = xsplit_a[0]
+      xsplit2_a = xsplit_a[1]
+      xsplit1_b = xsplit_b[0]
+      xsplit2_b = xsplit_b[1]
 
-      xsplit1 = torch.add(xsplit1_a, xsplit1_b)
-      xsplit2 = torch.add(xsplit2_a, xsplit2_b)
+      xsplit1 = xsplit1_a + xsplit1_b
+      xsplit2 = xsplit2_a + xsplit2_b
       # print("split_lg", xsplit2.shape, xsplit1.shape)
     else:
-      xsplit1 = self.split_lg(x_1)
-      xsplit2 = torch.clone(xsplit1)
+      xsplit_a = torch.split(x_1, 32, dim=1)
+      # xsplit_b = torch.split(x_2, 32, dim=1)
+      xsplit1 = xsplit_a[0]
+      xsplit2 = xsplit_a[1]
+      # xsplit1_b = xsplit_b[0]
+      # xsplit2_b = xsplit_b[1]
+
+      # xsplit1 = self.split_lg(x_1)
+      # xsplit2 = torch.clone(xsplit1)
 
     xl_l = self.l_l(xsplit1)
     xl_g = self.l_g(xsplit1)
@@ -140,12 +161,12 @@ class FFC(nn.Module):
     # print("convt", conv_bn_relu_2.shape)
     ifft = torch.fft.irfftn(conv_bn_relu_2)
     # print(ifft.shape)
-    spectral_out = torch.add(ifft, conv_bn_relu_1)
+    spectral_out = ifft + conv_bn_relu_1
     spectral_out_2 = self.conv1x1(spectral_out)
     # print("spectral_out_2", xl_g.shape, spectral_out_2.shape)
 
-    local_feat = self.bn_relu(torch.add(xl_g, spectral_out_2))
-    global_feat = self.bn_relu(torch.add(xl_l, xg_l))
+    local_feat = self.bn_relu(xl_g + spectral_out_2)
+    global_feat = self.bn_relu(xl_l + xg_l)
     # print("local_feat --", local_feat.shape, global_feat.shape)
 
     feat_out = torch.cat((local_feat, global_feat), dim=1)
@@ -168,6 +189,7 @@ class Neural_classifier(nn.Module):
         # nn.BatchNorm1d(64),
         # nn.Sigmoid(),
         nn.Linear(64, 11),
+        nn.Dropout(p=0.2),
         nn.Tanh()
     )
     # self.lin1 = nn.Linear(x_size, 1024)
@@ -187,6 +209,7 @@ class Neural_classifier(nn.Module):
       x_size = x.size(1)
       # print(x.size())
       x = self.classify(x)
+      x = F.softmax(x,dim=1)
       # x = F.linear(x, torch.randn(1024, x_size).to(self.device))
       # x = F.linear(x, torch.randn(1024, x_size))
       # x = self.lin1(x)
@@ -199,42 +222,41 @@ class Neural_classifier(nn.Module):
 
 class Builds(nn.Module):
   def __init__(self):
-    # def get_device():
-    #   if torch.cuda.is_available():
-    #       device = 'cuda:0'
-    #   else:
-    #       device = 'cpu'
-    #   return device
 
     super().__init__()
-
-    # self.device = get_device()
-    # self.convenc = CNNenc().to(self.device)
-    # self.ffc = FFC().to(self.device)
-    # self.classfy = Neural_classifier().to(self.device)
     self.convenc = CNNenc()
     self.ffc = FFC()
-    self.classfy = Neural_classifier()
+    # self.classfy = Neural_classifier()
+    self.classify = nn.Conv2d(64, 11, 1)
+
     # self.n_class = n_class
 
-  def forward(self, x):
+  def forward(self, x, criterion_2):
     batch_size = x.size(0)
     # n_class = self.n_class
 
     xenc_1, xenc_2 = self.convenc(x)
+    # print(xenc_1.view(64,-1).shape, xenc_2.view(64,-1).shape)
+
+    contrastive_loss = criterion_2(xenc_1, xenc_2, batch_size)
     # print("enc 1", xenc_1.shape)
     xffced1 = self.ffc(xenc_1, xenc_2, batch_size)
     xffced2 = self.ffc(xffced1, None, batch_size)
 
-    xcat = torch.add(xenc_1, xffced2)
+    xcat = xenc_1 + xffced2
     # print("FT",feat_out.shape)
     feat_out = xcat.view(xcat.size(0), xcat.size(1), -1)
     feat_out = feat_out.mean(dim=-1)
     # print("after global pool",feat_out.shape)
+    feat_class = self.classify(feat_out.view(-1,64,1,1,))
+    # print("feat_class", feat_class.shape)
+    feat_out = F.softmax(feat_class, dim=1)
+    feat_out = feat_out.squeeze()
+
 
     # xcat = xcat.reshape(batch_size,-1)
     # print("--- xcat ----- ", xcat.size())
 
-    classified = self.classfy(feat_out)
+    # classified = self.classfy(feat_out)
 
-    return classified
+    return feat_out, contrastive_loss

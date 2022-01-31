@@ -9,7 +9,7 @@ from tqdm import tqdm
 
 
 
-def trainer(epoch, train_loader, device, model, optimizer, criterion):
+def trainer(epoch, train_loader, device, model, optimizer, criterion_1, criterion_2):
     
 
     idx = 0
@@ -29,9 +29,9 @@ def trainer(epoch, train_loader, device, model, optimizer, criterion):
         # print("label shape", label.shape)
         # print(label[:10])
         optimizer.zero_grad()
-        out = model(views)
+        out, contrastive_loss = model(views, criterion_2)
         label = label.to(device)
-        loss = criterion(out, label.view(-1))
+        loss = 10*(criterion_1(out, label.view(-1))) + (5.0 * contrastive_loss)
         loss_so_far += loss.item() * batch_size
         loss.backward()
         optimizer.step()
@@ -42,7 +42,7 @@ def trainer(epoch, train_loader, device, model, optimizer, criterion):
         loss_out = loss_so_far/no_of_samples_so_far
         acc = total_correct/no_of_samples_so_far
 
-        tepoch.set_postfix(loss=loss_out, accuracy=100. * acc)
+        tepoch.set_postfix(loss=loss_out, accuracy=100. * acc, contrastive_loss=contrastive_loss.item())
         # if idx ==30:
         #   break;
         # idx += 1

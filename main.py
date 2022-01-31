@@ -6,7 +6,8 @@ from dataset import train_test_loader
 import train
 import test
 import metrics
-
+import constrastive_loss 
+from torch.optim.lr_scheduler import StepLR
 def main():
 
 	if os.path.exists(os.path.join(os.getcwd(), 'saved_models')):
@@ -23,42 +24,27 @@ def main():
 
 	device = get_device()
 	model = Builds().to(device)
-	optimizer = torch.optim.Adam(model.parameters(), lr=0.00001, betas=(0.5, 0.999))
-	criterion = nn.CrossEntropyLoss()
+	# optimizer = torch.optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
+	optimizer = torch.optim.Adam(model.parameters(), lr=0.01, betas=(0.5, 0.999))
+	criterion_1 = nn.CrossEntropyLoss()
+	criterion_2 = constrastive_loss.ContrastiveLoss()
 
 	load_model = Builds()
 	
 	train_loader = train_test_loader.train_loader()
 	test_loader = train_test_loader.test_loader()
 
+	scheduler = StepLR(optimizer, step_size=10, gamma=0.1, last_epoch=-1, verbose=False)
 
-	# print("len of train_loader_A", len(train_loader_A.dataset))
-	# print("len of train_loader_B", len(train_loader_B.dataset))
-	# for idxx, (im, lb,lbl) in enumerate(train_loader):
-	# 	print(im.shape, lb.shape, lbl)
-	# 	# print(lb[8])
-	# 	if idxx ==20:
-	# 			break
-	# xc = os.listdir(os.path.join(os.getcwd(), "datasets/Train/view_1/View1_photo"))
-	# labels = 
-	# print(test_loader_A.dataset.class_to_idx)
-	# for  idx, (ad, af) in enumerate((test_loader_B)):
-	# 	if idx%10 == 0:
-	# 		print(af[:10])
-	# 	# print(ad.shape)
-	# 	# if idxx == 3:
-	# 	# 	break
-	# 		# break
-	# 	elif idx == 500:
-	# 		break
 
 	for epoch in range(0,50):
 		# break
 
-		train.trainer(epoch, train_loader, device, model, optimizer, criterion)
+		train.trainer(epoch, train_loader, device, model, optimizer, criterion_1, criterion_2)
 		load_model.load_state_dict(torch.load(os.path.join(os.getcwd(),"saved_models/model.pth")))
 		load_model.to(device)
-		track_label, track_output = test.tester(epoch, test_loader, device, load_model)
+		track_label, track_output = test.tester(epoch, test_loader, device, load_model, criterion_2)
+		scheduler.step()
 
 	precision, recall, f1_score = metrics.cal_metric(track_label, track_output)
 	print("precision: ", precision)

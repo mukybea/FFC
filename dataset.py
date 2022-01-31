@@ -207,7 +207,7 @@ class train_test_loader:
                                                                                 transforms.Resize((500,500))]))
         test_loader = torch.utils.data.DataLoader(multiview_test_dataset,
                                              batch_size=64,
-                                             shuffle=False)
+                                             shuffle=True)
 
         # view_A_testset = torchvision.datasets.ImageFolder(root='../../../storage/research/mview/test/aerial', transform=transforms.Compose([
         #     transforms.ToTensor(),
