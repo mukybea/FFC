@@ -130,7 +130,8 @@ class train_test_loader:
         multiview_dataset = MultiviewDataset('/storage/research/mview/train/aerial',
                                              '/storage/research/mview/train/ground',
                                              transform=transforms.Compose([transforms.ToTensor(),
-                                                                           transforms.Resize((500,500))]))
+                                                                           transforms.Resize((224,224))]))#,
+                                                                           # transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]))
         
         train_loader = torch.utils.data.DataLoader(multiview_dataset,
                                               batch_size=64,
@@ -204,7 +205,8 @@ class train_test_loader:
         multiview_test_dataset = MultiviewDataset('/storage/research/mview/test/aerial',
                                                   '/storage/research/mview/test/ground',
                                                   transform=transforms.Compose([transforms.ToTensor(),
-                                                                                transforms.Resize((500,500))]))
+                                                                                transforms.Resize((224,224))]))#,
+                                                                                # transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]))
         test_loader = torch.utils.data.DataLoader(multiview_test_dataset,
                                              batch_size=64,
                                              shuffle=True)

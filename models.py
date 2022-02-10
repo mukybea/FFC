@@ -40,33 +40,35 @@ class CNNenc(nn.Module):
       self.conv1 = nn.Sequential(
       nn.Conv2d(3, 16, 3, 3),
       nn.LeakyReLU(),
-      nn.BatchNorm2d(16),
       nn.Conv2d(16, 32, 3, 2),
       nn.LeakyReLU(),
-      nn.Dropout2d(p=0.2),
+      # nn.Dropout2d(p=0.2),
+      nn.BatchNorm2d(32),
       nn.Conv2d(32, 64, 3, 1),
+      nn.LeakyReLU(),
+      # nn.Dropout2d(p=0.2),
       nn.BatchNorm2d(64),
-      nn.Dropout2d(p=0.2),
-      nn.LeakyReLU()
+      
       # nn.Sigmoid()
       )
 
       self.conv2 = nn.Sequential(
       nn.Conv2d(3, 16, 3, 3),
       nn.LeakyReLU(),
-      nn.BatchNorm2d(16),
       nn.Conv2d(16, 32, 3, 2),
       nn.LeakyReLU(),
-      nn.Dropout2d(p=0.2),
+      # nn.Dropout2d(p=0.2),
+      nn.BatchNorm2d(32),
       nn.Conv2d(32, 64, 3, 1),
-      nn.BatchNorm2d(64),
-      nn.Dropout2d(p=0.2),
       nn.LeakyReLU(),
+      # nn.Dropout2d(p=0.2),
+      nn.BatchNorm2d(64),
+      
       # nn.Sigmoid()
       )
       
-      self.attend1 = Attention()
-      self.attend2 = Attention()
+      # self.attend1 = Attention()
+      # self.attend2 = Attention()
       
 
   def forward(self, x):
@@ -82,13 +84,14 @@ class CNNenc(nn.Module):
     enc1 = self.conv1(x1)
     enc2 = self.conv2(x2)
     # print(enc1.shape)
-    att_enc1 = self.attend1(enc1)
-    att_enc2 = self.attend2(enc2)
+    # att_enc1 = self.attend1(enc1)
+    # att_enc2 = self.attend2(enc2)
 
-    post_att1 = torch.matmul(enc1, att_enc1) #element wise multiplication
-    post_att2 = torch.matmul(enc2, att_enc2)
+    # post_att1 = enc1 * att_enc1 #element wise multiplication
+    # post_att2 = enc2 * att_enc2
 
-    return post_att1, post_att2
+    # return post_att1, post_att2
+    return enc1, enc2
 
 class FFC(nn.Module):
   def __init__(self):
@@ -185,12 +188,15 @@ class Neural_classifier(nn.Module):
     super().__init__()
 
     self.classify = nn.Sequential(
-        # nn.Linear(15618304, 1024),
-        # nn.BatchNorm1d(64),
+        # nn.BatchNorm1d(4096),
+        nn.Linear(4096, 1024),
+        nn.ReLU(),
+        nn.Linear(1024, 11)
         # nn.Sigmoid(),
-        nn.Linear(64, 11),
-        nn.Dropout(p=0.2),
-        nn.Tanh()
+        # nn.Linear(64, 11),
+        # nn.Dropout(p=0.2)
+        # nn.LeakyReLU()
+        # nn.Tanh()
     )
     # self.lin1 = nn.Linear(x_size, 1024)
     # self.lin2 = nn.Linear(1024, nc)
@@ -209,7 +215,7 @@ class Neural_classifier(nn.Module):
       x_size = x.size(1)
       # print(x.size())
       x = self.classify(x)
-      x = F.softmax(x,dim=1)
+      # x = F.softmax(x,dim=1)
       # x = F.linear(x, torch.randn(1024, x_size).to(self.device))
       # x = F.linear(x, torch.randn(1024, x_size))
       # x = self.lin1(x)
@@ -226,31 +232,41 @@ class Builds(nn.Module):
     super().__init__()
     self.convenc = CNNenc()
     self.ffc = FFC()
-    # self.classfy = Neural_classifier()
-    self.classify = nn.Conv2d(64, 11, 1)
+    # self.classify = Neural_classifier()
+    self.conv_classify = nn.Sequential(
+    	nn.Conv2d(64, 11, 1),
+    	nn.ReLU()
+    	)
+    self.classify =	nn.Linear(11,11)
+    self.droput = nn.Dropout2d(p=0.1)
+    	
 
     # self.n_class = n_class
 
-  def forward(self, x, criterion_2):
+  def forward(self, x):
     batch_size = x.size(0)
     # n_class = self.n_class
 
     xenc_1, xenc_2 = self.convenc(x)
     # print(xenc_1.view(64,-1).shape, xenc_2.view(64,-1).shape)
 
-    contrastive_loss = criterion_2(xenc_1, xenc_2, batch_size)
+    # contrastive_loss = criterion_2(xenc_1, xenc_2, batch_size)
     # print("enc 1", xenc_1.shape)
     xffced1 = self.ffc(xenc_1, xenc_2, batch_size)
-    xffced2 = self.ffc(xffced1, None, batch_size)
+    # xffced2 = self.ffc(xffced1, None, batch_size)
 
-    xcat = xenc_1 + xffced2
+    # xcat = xenc_1 + xffced2
+    xcat = xffced1
     # print("FT",feat_out.shape)
+    # feat_out = xcat.view(xcat.size(0), xcat.size(1), -1)
     feat_out = xcat.view(xcat.size(0), xcat.size(1), -1)
+    # print("feat_out.shape", feat_out.shape)
     feat_out = feat_out.mean(dim=-1)
     # print("after global pool",feat_out.shape)
-    feat_class = self.classify(feat_out.view(-1,64,1,1,))
+    # feat_class = self.classify(feat_out)
+    feat_class = self.classify(self.conv_classify(self.droput(feat_out).view(-1,64,1,1,)).squeeze())
     # print("feat_class", feat_class.shape)
-    feat_out = F.softmax(feat_class, dim=1)
+    # feat_out = F.softmax(feat_class, dim=-1)
     feat_out = feat_out.squeeze()
 
 
@@ -259,4 +275,4 @@ class Builds(nn.Module):
 
     # classified = self.classfy(feat_out)
 
-    return feat_out, contrastive_loss
+    return feat_out, xenc_1, xenc_2
